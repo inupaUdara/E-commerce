@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 
-import { logout, setAuthFromStorage } from "@/lib/features/auth/authSlice";
+import { fetchCurrentUser, logout, setAuthFromStorage } from "@/lib/features/auth/authSlice";
 import { useDispatch } from "react-redux";
 
 const Navbar = () => {
@@ -17,10 +17,17 @@ const Navbar = () => {
     const [mounted, setMounted] = useState(false)
     const cartCount = useSelector(state => state.cart.total)
     const isAuthenticated = useSelector(state => state.auth.isAuthenticated)
+    const user = useSelector(state => state.auth.user)
 
     useEffect(() => {
         // Load auth state from localStorage on client-side mount
         dispatch(setAuthFromStorage())
+
+        const token = localStorage.getItem('token')
+        if (token) {
+            dispatch(fetchCurrentUser())
+        }
+
         setMounted(true)
     }, [dispatch])
 
@@ -50,8 +57,8 @@ const Navbar = () => {
                     <div className="hidden sm:flex items-center gap-4 lg:gap-8 text-slate-600 font-medium">
                         <Link href="/" className="hover:text-green-600 transition">Home</Link>
                         <Link href="/shop" className="hover:text-green-600 transition">Shop</Link>
-                        <Link href="/" className="hover:text-green-600 transition">About</Link>
-                        <Link href="/" className="hover:text-green-600 transition">Contact</Link>
+                        {/* <Link href="/" className="hover:text-green-600 transition">About</Link> */}
+                        <Link href="/orders" className="hover:text-green-600 transition">Orders</Link>
 
                         <form onSubmit={handleSearch} className="hidden xl:flex items-center w-80 text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full focus-within:ring-2 ring-green-500/20 transition">
                             <Search size={18} className="text-slate-500" />
@@ -66,9 +73,12 @@ const Navbar = () => {
 
                         {mounted ? (
                             isAuthenticated ? (
-                                <button onClick={handleLogout} className="px-6 py-2.5 bg-red-500 hover:bg-red-600 transition shadow-lg shadow-red-500/30 text-white rounded-full font-semibold text-sm">
-                                    Logout
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <p className="text-sm text-slate-700">Hi, {user?.name || 'User'}</p>
+                                    <button onClick={handleLogout} className="px-6 py-2.5 bg-red-500 hover:bg-red-600 transition shadow-lg shadow-red-500/30 text-white rounded-full font-semibold text-sm">
+                                        Logout
+                                    </button>
+                                </div>
                             ) : (
                                 <Link href="/auth/login">
                                     <button className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30 text-white rounded-full font-semibold text-sm">
@@ -86,9 +96,12 @@ const Navbar = () => {
                     <div className="sm:hidden">
                         {mounted ? (
                             isAuthenticated ? (
-                                <button onClick={handleLogout} className="px-7 py-1.5 bg-red-500 hover:bg-red-600 text-sm transition text-white rounded-full">
-                                    Logout
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm text-slate-700 max-w-20 truncate">{user?.name || 'User'}</p>
+                                    <button onClick={handleLogout} className="px-7 py-1.5 bg-red-500 hover:bg-red-600 text-sm transition text-white rounded-full">
+                                        Logout
+                                    </button>
+                                </div>
                             ) : (
                                 <Link href="/auth/login">
                                     <button className="px-7 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-sm transition text-white rounded-full">

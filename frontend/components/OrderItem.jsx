@@ -5,14 +5,25 @@ import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
 import RatingModal from "./RatingModal";
+import { useDispatch } from "react-redux";
+import { addRating } from "@/lib/features/rating/ratingSlice";
 
 const OrderItem = ({ order }) => {
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
     const [ratingModal, setRatingModal] = useState(null);
+    const dispatch = useDispatch();
 
     const { ratings } = useSelector(state => state.rating);
     const statusValue = String(order?.status || '').toUpperCase();
+
+    const handleRatingSubmitted = (savedRating) => {
+        if (!savedRating) {
+            return;
+        }
+
+        dispatch(addRating(savedRating));
+    };
 
     return (
         <>
@@ -37,9 +48,9 @@ const OrderItem = ({ order }) => {
                                     <div>
                                         {ratings.find(rating => order.id === rating.orderId && item?.product?.id === rating.productId)
                                             ? <Rating value={ratings.find(rating => order.id === rating.orderId && item?.product?.id === rating.productId).rating} />
-                                            : <button onClick={() => setRatingModal({ orderId: order.id, productId: item?.product?.id })} className={`text-green-500 hover:bg-green-50 transition ${statusValue !== "DELIVERED" && 'hidden'}`}>Rate Product</button>
+                                            : <button onClick={() => setRatingModal({ orderId: order.id, productId: item?.product?.id, userId: order?.user?.id || order?.userId })} className={`text-green-500 hover:bg-green-50 transition ${statusValue !== "DELIVERED" && 'hidden'}`}>Rate Product</button>
                                         }</div>
-                                    {ratingModal && <RatingModal ratingModal={ratingModal} setRatingModal={setRatingModal} />}
+                                    {ratingModal && <RatingModal ratingModal={ratingModal} setRatingModal={setRatingModal} onRatingSubmitted={handleRatingSubmitted} />}
                                 </div>
                             </div>
                         ))}

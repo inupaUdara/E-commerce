@@ -5,6 +5,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getProductById } from "@/lib/api/productApi";
 import Loading from "@/components/Loading";
+import { getRatingsByProductId } from "@/lib/api/ratingApi";
+import { getUserById } from "@/lib/api/userApi";
+import { getStoreById } from "@/lib/api/storeApi";
 
 export default function Product() {
 
@@ -24,7 +27,29 @@ export default function Product() {
             }
 
             const data = await getProductById(safeProductId)
-            setProduct(data)
+            const [ratingList, store] = await Promise.all([
+                getRatingsByProductId(safeProductId).catch(() => []),
+                data?.storeId ? getStoreById(data.storeId).catch(() => null) : Promise.resolve(null),
+            ])
+
+            const uniqueUserIds = [...new Set((ratingList || []).map((rating) => rating?.userId).filter(Boolean))]
+            const users = await Promise.all(uniqueUserIds.map((userId) => getUserById(userId).catch(() => null)))
+            const userMap = new Map(users.filter(Boolean).map((user) => [user.id, user]))
+
+            const hydratedRatings = (ratingList || []).map((rating) => ({
+                ...rating,
+                user: userMap.get(rating.userId) || {
+                    id: rating.userId,
+                    name: 'Anonymous',
+                    image: '/favicon.ico',
+                },
+            }))
+
+            setProduct({
+                ...data,
+                rating: hydratedRatings,
+                store: store || null,
+            })
         } catch (error) {
             setProduct(null)
         } finally {

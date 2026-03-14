@@ -2,21 +2,76 @@
 import { StarIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { getRatingsByProductId } from '@/lib/api/ratingApi'
 
 const ProductCard = ({ product }) => {
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
-
-    // calculate the average rating of the product
-    const ratings = Array.isArray(product.rating) ? product.rating : []
-    const rating = ratings.length > 0
-        ? Math.round(ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length)
-        : 0;
+    const [ratingValue, setRatingValue] = useState(0)
 
     // Support mixed product payloads and keep route generation safe.
     const productId = product?.id || product?._id || product?.productId
     const productHref = productId ? `/product/${encodeURIComponent(productId)}` : '/shop'
+
+    useEffect(() => {
+        let isMounted = true
+
+        const hydrateRating = async () => {
+            const ratings = Array.isArray(product?.rating) ? product.rating : []
+
+            if (ratings.length > 0) {
+                const average = Math.round(ratings.reduce((acc, curr) => acc + Number(curr?.rating || 0), 0) / ratings.length)
+                if (isMounted) {
+                    setRatingValue(average)
+                }
+                return
+            }
+
+            if (typeof product?.rating === 'number') {
+                if (isMounted) {
+                    setRatingValue(Math.round(product.rating))
+                }
+                return
+            }
+
+            if (typeof product?.averageRating === 'number') {
+                if (isMounted) {
+                    setRatingValue(Math.round(product.averageRating))
+                }
+                return
+            }
+
+            if (!productId) {
+                if (isMounted) {
+                    setRatingValue(0)
+                }
+                return
+            }
+
+            try {
+                const backendRatings = await getRatingsByProductId(productId)
+                const safeRatings = Array.isArray(backendRatings) ? backendRatings : []
+                const average = safeRatings.length > 0
+                    ? Math.round(safeRatings.reduce((acc, curr) => acc + Number(curr?.rating || 0), 0) / safeRatings.length)
+                    : 0
+
+                if (isMounted) {
+                    setRatingValue(average)
+                }
+            } catch {
+                if (isMounted) {
+                    setRatingValue(0)
+                }
+            }
+        }
+
+        hydrateRating()
+
+        return () => {
+            isMounted = false
+        }
+    }, [product?.rating, product?.averageRating, productId])
 
     return (
         <Link href={productHref} className=' group max-xl:mx-auto'>
@@ -28,7 +83,7 @@ const ProductCard = ({ product }) => {
                     <p>{product.name}</p>
                     <div className='flex'>
                         {Array(5).fill('').map((_, index) => (
-                            <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={rating >= index + 1 ? "#00C950" : "#D1D5DB"} />
+                            <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={ratingValue >= index + 1 ? "#00C950" : "#D1D5DB"} />
                         ))}
                     </div>
                 </div>

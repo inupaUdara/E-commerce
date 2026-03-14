@@ -1,9 +1,12 @@
 'use client'
-import { dummyAdminDashboardData } from "@/assets/assets"
 import Loading from "@/components/Loading"
 import OrdersAreaChart from "@/components/OrdersAreaChart"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StoreIcon, TagsIcon } from "lucide-react"
 import { useEffect, useState } from "react"
+import { getAllProducts } from "@/lib/api/productApi"
+import { getAllOrders } from "@/lib/api/orderApi"
+import { getAllStores } from "@/lib/api/storeApi"
+import toast from "react-hot-toast"
 
 export default function AdminDashboard() {
 
@@ -26,8 +29,42 @@ export default function AdminDashboard() {
     ]
 
     const fetchDashboardData = async () => {
-        setDashboardData(dummyAdminDashboardData)
-        setLoading(false)
+        setLoading(true)
+        try {
+            const [products, orders, stores] = await Promise.all([
+                getAllProducts(),
+                getAllOrders(),
+                getAllStores(),
+            ])
+
+            const safeProducts = Array.isArray(products) ? products : []
+            const safeOrders = Array.isArray(orders) ? orders : []
+            const safeStores = Array.isArray(stores) ? stores : []
+
+            const revenue = safeOrders.reduce((sum, order) => {
+                const paid = order?.isPaid === true || String(order?.status || '').toUpperCase() === 'DELIVERED'
+                return paid ? sum + Number(order?.total || 0) : sum
+            }, 0)
+
+            setDashboardData({
+                products: safeProducts.length,
+                revenue: Number(revenue.toFixed(2)),
+                orders: safeOrders.length,
+                stores: safeStores.length,
+                allOrders: safeOrders,
+            })
+        } catch (error) {
+            setDashboardData({
+                products: 0,
+                revenue: 0,
+                orders: 0,
+                stores: 0,
+                allOrders: [],
+            })
+            toast.error(error?.response?.data?.message || 'Failed to load admin dashboard')
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {

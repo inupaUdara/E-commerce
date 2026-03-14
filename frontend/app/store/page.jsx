@@ -1,10 +1,15 @@
 'use client'
-import { dummyStoreDashboardData } from "@/assets/assets"
 import Loading from "@/components/Loading"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { getMyStore } from "@/lib/api/storeApi"
+import { getProductsByStoreId } from "@/lib/api/productApi"
+import { getOrdersByStoreId } from "@/lib/api/orderApi"
+import { getRatingsByProductId } from "@/lib/api/ratingApi"
+import { getUserById } from "@/lib/api/userApi"
+import toast from "react-hot-toast"
 
 export default function Dashboard() {
 
@@ -22,14 +27,80 @@ export default function Dashboard() {
 
     const dashboardCardsData = [
         { title: 'Total Products', value: dashboardData.totalProducts, icon: ShoppingBasketIcon },
-        { title: 'Total Earnings', value: currency + dashboardData.totalEarnings, icon: CircleDollarSignIcon },
+        { title: 'Total Earnings', value: currency + Number(dashboardData.totalEarnings || 0).toFixed(2), icon: CircleDollarSignIcon },
         { title: 'Total Orders', value: dashboardData.totalOrders, icon: TagsIcon },
         { title: 'Total Ratings', value: dashboardData.ratings.length, icon: StarIcon },
     ]
 
     const fetchDashboardData = async () => {
-        setDashboardData(dummyStoreDashboardData)
-        setLoading(false)
+        setLoading(true)
+        try {
+            const store = await getMyStore()
+
+            if (!store?.id) {
+                setDashboardData({
+                    totalProducts: 0,
+                    totalEarnings: 0,
+                    totalOrders: 0,
+                    ratings: [],
+                })
+                return
+            }
+
+            const [products, orders] = await Promise.all([
+                getProductsByStoreId(store.id),
+                getOrdersByStoreId(store.id),
+            ])
+
+            const productList = products || []
+            const orderList = orders || []
+
+            const ratingCollections = await Promise.all(productList.map((product) => getRatingsByProductId(product.id).catch(() => [])))
+            const ratings = ratingCollections.flat().filter(Boolean)
+
+            const uniqueUserIds = [...new Set(ratings.map((rating) => rating.userId).filter(Boolean))]
+            const users = await Promise.all(uniqueUserIds.map((userId) => getUserById(userId).catch(() => null)))
+            const userMap = new Map(users.filter(Boolean).map((user) => [user.id, user]))
+            const productMap = new Map(productList.map((product) => [product.id, product]))
+
+            const hydratedRatings = ratings
+                .map((rating) => ({
+                    ...rating,
+                    user: userMap.get(rating.userId) || {
+                        id: rating.userId,
+                        name: 'Anonymous',
+                        image: '/favicon.ico',
+                    },
+                    product: productMap.get(rating.productId) || {
+                        id: rating.productId,
+                        name: 'Product unavailable',
+                        category: 'Unknown',
+                    },
+                }))
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+            const totalEarnings = orderList.reduce((sum, order) => {
+                const paid = order?.isPaid === true || String(order?.status || '').toUpperCase() === 'DELIVERED'
+                return paid ? sum + Number(order?.total || 0) : sum
+            }, 0)
+
+            setDashboardData({
+                totalProducts: productList.length,
+                totalEarnings,
+                totalOrders: orderList.length,
+                ratings: hydratedRatings,
+            })
+        } catch (error) {
+            setDashboardData({
+                totalProducts: 0,
+                totalEarnings: 0,
+                totalOrders: 0,
+                ratings: [],
+            })
+            toast.error(error?.response?.data?.message || 'Failed to load store dashboard')
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
@@ -60,13 +131,13 @@ export default function Dashboard() {
 
             <div className="mt-5">
                 {
-                    dashboardData.ratings.map((review, index) => (
+                    dashboardData.ratings.length > 0 ? dashboardData.ratings.map((review, index) => (
                         <div key={index} className="flex max-sm:flex-col gap-5 sm:items-center justify-between py-6 border-b border-slate-200 text-sm text-slate-600 max-w-4xl">
                             <div>
                                 <div className="flex gap-3">
-                                    <Image src={review.user.image} alt="" className="w-10 aspect-square rounded-full" width={100} height={100} />
+                                    <Image src={review?.user?.image || '/favicon.ico'} alt="" className="w-10 aspect-square rounded-full" width={100} height={100} />
                                     <div>
-                                        <p className="font-medium">{review.user.name}</p>
+                                        <p className="font-medium">{review?.user?.name || 'Anonymous'}</p>
                                         <p className="font-light text-slate-500">{new Date(review.createdAt).toDateString()}</p>
                                     </div>
                                 </div>
@@ -85,7 +156,9 @@ export default function Dashboard() {
                                 <button onClick={() => router.push(`/product/${review.product.id}`)} className="bg-slate-100 px-5 py-2 hover:bg-slate-200 rounded transition-all">View Product</button>
                             </div>
                         </div>
-                    ))
+                    )) : (
+                        <p className="text-slate-400 text-sm">No ratings for your store products yet</p>
+                    )
                 }
             </div>
         </div>

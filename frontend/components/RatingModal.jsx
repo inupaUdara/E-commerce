@@ -4,18 +4,35 @@ import { Star } from 'lucide-react';
 import React, { useState } from 'react'
 import { XIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { createRating } from '@/lib/api/ratingApi';
 
-const RatingModal = ({ ratingModal, setRatingModal }) => {
+const RatingModal = ({ ratingModal, setRatingModal, onRatingSubmitted }) => {
 
     const [rating, setRating] = useState(0);
     const [review, setReview] = useState('');
 
     const handleSubmit = async () => {
-        if (rating < 0 || rating > 5) {
+        if (rating < 1 || rating > 5) {
             return toast('Please select a rating');
         }
         if (review.length < 5) {
             return toast('write a short review');
+        }
+
+        if (!ratingModal?.orderId || !ratingModal?.productId || !ratingModal?.userId) {
+            throw new Error('Missing rating information. Please refresh and try again.');
+        }
+
+        const savedRating = await createRating({
+            rating,
+            review,
+            userId: ratingModal.userId,
+            productId: ratingModal.productId,
+            orderId: ratingModal.orderId,
+        });
+
+        if (onRatingSubmitted) {
+            onRatingSubmitted(savedRating);
         }
 
         setRatingModal(null);
@@ -44,7 +61,11 @@ const RatingModal = ({ ratingModal, setRatingModal }) => {
                     value={review}
                     onChange={(e) => setReview(e.target.value)}
                 ></textarea>
-                <button onClick={e => toast.promise(handleSubmit(), { loading: 'Submitting...' })} className='w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition'>
+                <button onClick={e => toast.promise(handleSubmit(), {
+                    loading: 'Submitting...',
+                    success: 'Rating submitted',
+                    error: (error) => error?.response?.data?.message || error?.response?.data || error?.message || 'Failed to submit rating',
+                })} className='w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition'>
                     Submit Rating
                 </button>
             </div>

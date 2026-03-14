@@ -7,11 +7,15 @@ import { getCurrentUser } from "@/lib/api/userApi";
 import { getOrdersByUserId } from "@/lib/api/orderApi";
 import { getAddressById } from "@/lib/api/addressApi";
 import { getProductById } from "@/lib/api/productApi";
+import { getRatingsByUserId } from "@/lib/api/ratingApi";
+import { useDispatch } from "react-redux";
+import { setRatings } from "@/lib/features/rating/ratingSlice";
 
 export default function Orders() {
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
 
     const parseCoupon = (couponValue) => {
         if (!couponValue) {
@@ -35,7 +39,12 @@ export default function Orders() {
 
         try {
             const user = await getCurrentUser();
-            const userOrders = await getOrdersByUserId(user.id);
+            const [userOrders, userRatings] = await Promise.all([
+                getOrdersByUserId(user.id),
+                getRatingsByUserId(user.id).catch(() => []),
+            ]);
+
+            dispatch(setRatings(userRatings || []));
 
             const hydratedOrders = await Promise.all((userOrders || []).map(async (order) => {
                 const addressPromise = order?.addressId ? getAddressById(order.addressId).catch(() => null) : Promise.resolve(null);
@@ -70,6 +79,7 @@ export default function Orders() {
             setOrders(hydratedOrders);
         } catch {
             setOrders([]);
+            dispatch(setRatings([]));
         } finally {
             setLoading(false);
         }
