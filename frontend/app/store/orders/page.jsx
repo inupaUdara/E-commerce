@@ -1,22 +1,123 @@
 'use client'
 import { useEffect, useState } from "react"
 import Loading from "@/components/Loading"
-import { orderDummyData } from "@/assets/assets"
+import toast from "react-hot-toast"
+import { getOrdersByStoreId, updateOrder } from "@/lib/api/orderApi"
+import { getAddressById } from "@/lib/api/addressApi"
+import { getProductById } from "@/lib/api/productApi"
+import { getMyStore } from "@/lib/api/storeApi"
+import { getUserById } from "@/lib/api/userApi"
+
+const ORDER_STATUSES = ['ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
 
 export default function StoreOrders() {
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [updatingOrderId, setUpdatingOrderId] = useState(null)
 
+    const parseCoupon = (couponValue) => {
+        if (!couponValue) {
+            return null
+        }
+
+        if (typeof couponValue === 'object') {
+            return Object.keys(couponValue).length > 0 ? couponValue : null
+        }
+
+        try {
+            const parsedCoupon = JSON.parse(couponValue)
+            return Object.keys(parsedCoupon || {}).length > 0 ? parsedCoupon : null
+        } catch {
+            return null
+        }
+    }
 
     const fetchOrders = async () => {
-       setOrders(orderDummyData)
-       setLoading(false)
+        setLoading(true)
+        try {
+            const store = await getMyStore()
+
+            if (!store?.id) {
+                setOrders([])
+                return
+            }
+
+            const storeOrders = await getOrdersByStoreId(store.id)
+
+            const hydratedOrders = await Promise.all((storeOrders || []).map(async (order) => {
+                const userPromise = order?.userId ? getUserById(order.userId).catch(() => null) : Promise.resolve(null)
+                const addressPromise = order?.addressId ? getAddressById(order.addressId).catch(() => null) : Promise.resolve(null)
+
+                const productIds = (order?.orderItems || []).map((item) => item?.id?.productId).filter(Boolean)
+                const uniqueProductIds = [...new Set(productIds)]
+                const products = await Promise.all(uniqueProductIds.map((productId) => getProductById(productId).catch(() => null)))
+                const productMap = new Map(products.filter(Boolean).map((product) => [product.id, product]))
+
+                const [user, address] = await Promise.all([userPromise, addressPromise])
+
+                return {
+                    ...order,
+                    user,
+                    address,
+                    coupon: parseCoupon(order?.coupon),
+                    orderItems: (order?.orderItems || []).map((item) => {
+                        const productId = item?.id?.productId
+                        const product = productMap.get(productId) || {
+                            id: productId,
+                            name: 'Product unavailable',
+                            images: ['/favicon.ico'],
+                        }
+
+                        return {
+                            ...item,
+                            product,
+                            productId,
+                        }
+                    }),
+                }
+            }))
+
+            setOrders(hydratedOrders)
+        } catch (error) {
+            setOrders([])
+            toast.error(error?.response?.data?.message || 'Failed to load store orders')
+        } finally {
+            setLoading(false)
+        }
     }
 
     const updateOrderStatus = async (orderId, status) => {
-        // Logic to update the status of an order
+        try {
+            setUpdatingOrderId(orderId)
+            const updatedOrder = await updateOrder(orderId, { status })
+
+            setOrders((previousOrders) => previousOrders.map((order) => {
+                if (order.id !== orderId) {
+                    return order
+                }
+
+                const nextOrder = {
+                    ...order,
+                    status: updatedOrder?.status || status,
+                    isPaid: typeof updatedOrder?.isPaid === 'boolean' ? updatedOrder.isPaid : order.isPaid,
+                    updatedAt: updatedOrder?.updatedAt || order.updatedAt,
+                }
+
+                if (selectedOrder?.id === orderId) {
+                    setSelectedOrder(nextOrder)
+                }
+
+                return nextOrder
+            }))
+
+            toast.success('Order status updated')
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Failed to update order status')
+        } finally {
+            setUpdatingOrderId(null)
+        }
 
 
     }
@@ -63,12 +164,12 @@ export default function StoreOrders() {
                                         {index + 1}
                                     </td>
                                     <td className="px-4 py-3">{order.user?.name}</td>
-                                    <td className="px-4 py-3 font-medium text-slate-800">${order.total}</td>
+                                    <td className="px-4 py-3 font-medium text-slate-800">${Number(order.total || 0).toFixed(2)}</td>
                                     <td className="px-4 py-3">{order.paymentMethod}</td>
                                     <td className="px-4 py-3">
                                         {order.isCouponUsed ? (
                                             <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
-                                                {order.coupon?.code}
+                                                {order.coupon?.code || 'Applied'}
                                             </span>
                                         ) : (
                                             "—"
@@ -79,11 +180,11 @@ export default function StoreOrders() {
                                             value={order.status}
                                             onChange={e => updateOrderStatus(order.id, e.target.value)}
                                             className="border-gray-300 rounded-md text-sm focus:ring focus:ring-blue-200"
+                                            disabled={updatingOrderId === order.id}
                                         >
-                                            <option value="ORDER_PLACED">ORDER_PLACED</option>
-                                            <option value="PROCESSING">PROCESSING</option>
-                                            <option value="SHIPPED">SHIPPED</option>
-                                            <option value="DELIVERED">DELIVERED</option>
+                                            {ORDER_STATUSES.map((statusValue) => (
+                                                <option key={statusValue} value={statusValue}>{statusValue}</option>
+                                            ))}
                                         </select>
                                     </td>
                                     <td className="px-4 py-3 text-gray-500">
@@ -108,9 +209,9 @@ export default function StoreOrders() {
                         <div className="mb-4">
                             <h3 className="font-semibold mb-2">Customer Details</h3>
                             <p><span className="text-green-700">Name:</span> {selectedOrder.user?.name}</p>
-                            <p><span className="text-green-700">Email:</span> {selectedOrder.user?.email}</p>
-                            <p><span className="text-green-700">Phone:</span> {selectedOrder.address?.phone}</p>
-                            <p><span className="text-green-700">Address:</span> {`${selectedOrder.address?.street}, ${selectedOrder.address?.city}, ${selectedOrder.address?.state}, ${selectedOrder.address?.zip}, ${selectedOrder.address?.country}`}</p>
+                            <p><span className="text-green-700">Email:</span> {selectedOrder.user?.email || 'N/A'}</p>
+                            <p><span className="text-green-700">Phone:</span> {selectedOrder.address?.phone || 'N/A'}</p>
+                            <p><span className="text-green-700">Address:</span> {`${selectedOrder.address?.street || ''}, ${selectedOrder.address?.city || ''}, ${selectedOrder.address?.state || ''}, ${selectedOrder.address?.zip || ''}, ${selectedOrder.address?.country || ''}`}</p>
                         </div>
 
                         {/* Products */}
@@ -120,7 +221,7 @@ export default function StoreOrders() {
                                 {selectedOrder.orderItems.map((item, i) => (
                                     <div key={i} className="flex items-center gap-4 border border-slate-100 shadow rounded p-2">
                                         <img
-                                            src={item.product.images?.[0].src || item.product.images?.[0]}
+                                            src={item?.product?.images?.[0] || '/favicon.ico'}
                                             alt={item.product?.name}
                                             className="w-16 h-16 object-cover rounded"
                                         />
@@ -139,7 +240,7 @@ export default function StoreOrders() {
                             <p><span className="text-green-700">Payment Method:</span> {selectedOrder.paymentMethod}</p>
                             <p><span className="text-green-700">Paid:</span> {selectedOrder.isPaid ? "Yes" : "No"}</p>
                             {selectedOrder.isCouponUsed && (
-                                <p><span className="text-green-700">Coupon:</span> {selectedOrder.coupon.code} ({selectedOrder.coupon.discount}% off)</p>
+                                <p><span className="text-green-700">Coupon:</span> {selectedOrder.coupon?.code || 'Applied'} ({selectedOrder.coupon?.discount || 0}% off)</p>
                             )}
                             <p><span className="text-green-700">Status:</span> {selectedOrder.status}</p>
                             <p><span className="text-green-700">Order Date:</span> {new Date(selectedOrder.createdAt).toLocaleString()}</p>

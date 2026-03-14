@@ -14,8 +14,11 @@ import com.gocart.orderservice.repository.OrderItemRepository;
 import com.gocart.orderservice.repository.OrderRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,6 +28,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderService {
 
     private final OrderRepository orderRepository;
@@ -36,35 +40,63 @@ public class OrderService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public Order createOrder(OrderRequest request) {
+    public Order createOrder(String authorization, OrderRequest request) {
+        if (authorization == null || authorization.isBlank() || !authorization.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authorization token is required");
+        }
+
         // Validate user exists
         try {
-            UserResponse user = userServiceClient.getUserById(request.getUserId());
+            UserResponse user = userServiceClient.getCurrentUser(authorization);
             if (user == null) {
-                throw new RuntimeException("User not found with id: " + request.getUserId());
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unable to identify the current user");
             }
+            if (user.getId() == null || !user.getId().equals(request.getUserId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Order user does not match the authenticated user");
+            }
+        } catch (FeignException.Forbidden e) {
+            log.error("User validation failed with forbidden response", e);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired token");
         } catch (FeignException.NotFound e) {
-            throw new RuntimeException("User not found with id: " + request.getUserId());
+            log.error("Authenticated user lookup returned not found", e);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found");
+        } catch (FeignException e) {
+            log.error("Unable to validate user. status={}, content={}", e.status(), e.contentUTF8(), e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to validate user");
         }
 
         // Validate address exists
         try {
-            AddressResponse address = userServiceClient.getAddressById(request.getAddressId());
+            AddressResponse address = userServiceClient.getAddressById(request.getAddressId(), authorization);
             if (address == null) {
-                throw new RuntimeException("Address not found with id: " + request.getAddressId());
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found with id: " + request.getAddressId());
+            }
+            if (address.getUserId() != null && !address.getUserId().equals(request.getUserId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Selected address does not belong to the current user");
             }
         } catch (FeignException.NotFound e) {
-            throw new RuntimeException("Address not found with id: " + request.getAddressId());
+            log.error("Address not found during order creation. addressId={}", request.getAddressId(), e);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found with id: " + request.getAddressId());
+        } catch (FeignException.Forbidden e) {
+            log.error("Address validation failed with forbidden response", e);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+        } catch (FeignException e) {
+            log.error("Unable to validate address. status={}, content={}", e.status(), e.contentUTF8(), e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to validate address");
         }
 
         // Validate store exists
         try {
             StoreResponse store = storeServiceClient.getStoreById(request.getStoreId());
             if (store == null) {
-                throw new RuntimeException("Store not found with id: " + request.getStoreId());
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found with id: " + request.getStoreId());
             }
         } catch (FeignException.NotFound e) {
-            throw new RuntimeException("Store not found with id: " + request.getStoreId());
+            log.error("Store not found during order creation. storeId={}", request.getStoreId(), e);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found with id: " + request.getStoreId());
+        } catch (FeignException e) {
+            log.error("Unable to validate store. status={}, content={}", e.status(), e.contentUTF8(), e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to validate store");
         }
 
         // Validate all products exist and calculate total
@@ -73,14 +105,18 @@ public class OrderService {
             try {
                 ProductResponse product = productServiceClient.getProductById(item.getProductId());
                 if (product == null) {
-                    throw new RuntimeException("Product not found with id: " + item.getProductId());
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found with id: " + item.getProductId());
                 }
                 if (!product.getInStock()) {
-                    throw new RuntimeException("Product is out of stock: " + item.getProductId());
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product is out of stock: " + item.getProductId());
                 }
                 subtotal += item.getPrice() * item.getQuantity();
             } catch (FeignException.NotFound e) {
-                throw new RuntimeException("Product not found with id: " + item.getProductId());
+                log.error("Product not found during order creation. productId={}", item.getProductId(), e);
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found with id: " + item.getProductId());
+            } catch (FeignException e) {
+                log.error("Unable to validate product {}. status={}, content={}", item.getProductId(), e.status(), e.contentUTF8(), e);
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to validate product: " + item.getProductId());
             }
         }
 

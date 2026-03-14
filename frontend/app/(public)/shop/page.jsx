@@ -3,7 +3,9 @@ import { Suspense } from "react"
 import ProductCard from "@/components/ProductCard"
 import { MoveLeftIcon } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useSelector } from "react-redux"
+import { useEffect, useState } from "react"
+import { getAllProducts } from "@/lib/api/productApi"
+import Loading from "@/components/Loading"
 
  function ShopContent() {
 
@@ -12,13 +14,33 @@ import { useSelector } from "react-redux"
     const search = searchParams.get('search')
     const router = useRouter()
 
-    const products = useSelector(state => state.product.list)
+    const [products, setProducts] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const data = await getAllProducts()
+                setProducts((data || []).filter((product) => product?.inStock !== false))
+            } catch (error) {
+                setProducts([])
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchProducts()
+    }, [])
 
     const filteredProducts = search
         ? products.filter(product =>
             product.name.toLowerCase().includes(search.toLowerCase())
         )
         : products;
+
+    if (loading) {
+        return <Loading />
+    }
 
     return (
         <div className="min-h-[70vh] mx-6">

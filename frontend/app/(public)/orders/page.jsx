@@ -2,15 +2,86 @@
 import PageTitle from "@/components/PageTitle"
 import { useEffect, useState } from "react";
 import OrderItem from "@/components/OrderItem";
-import { orderDummyData } from "@/assets/assets";
+import Loading from "@/components/Loading";
+import { getCurrentUser } from "@/lib/api/userApi";
+import { getOrdersByUserId } from "@/lib/api/orderApi";
+import { getAddressById } from "@/lib/api/addressApi";
+import { getProductById } from "@/lib/api/productApi";
 
 export default function Orders() {
 
     const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const parseCoupon = (couponValue) => {
+        if (!couponValue) {
+            return null;
+        }
+
+        if (typeof couponValue === 'object') {
+            return Object.keys(couponValue).length > 0 ? couponValue : null;
+        }
+
+        try {
+            const parsedCoupon = JSON.parse(couponValue);
+            return Object.keys(parsedCoupon || {}).length > 0 ? parsedCoupon : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const fetchOrders = async () => {
+        setLoading(true);
+
+        try {
+            const user = await getCurrentUser();
+            const userOrders = await getOrdersByUserId(user.id);
+
+            const hydratedOrders = await Promise.all((userOrders || []).map(async (order) => {
+                const addressPromise = order?.addressId ? getAddressById(order.addressId).catch(() => null) : Promise.resolve(null);
+                const productIds = (order?.orderItems || []).map((item) => item?.id?.productId).filter(Boolean);
+                const uniqueProductIds = [...new Set(productIds)];
+                const products = await Promise.all(uniqueProductIds.map((productId) => getProductById(productId).catch(() => null)));
+                const productMap = new Map(products.filter(Boolean).map((product) => [product.id, product]));
+                const address = await addressPromise;
+
+                return {
+                    ...order,
+                    user,
+                    address,
+                    coupon: parseCoupon(order?.coupon),
+                    orderItems: (order?.orderItems || []).map((item) => {
+                        const productId = item?.id?.productId;
+                        const product = productMap.get(productId) || {
+                            id: productId,
+                            name: 'Product unavailable',
+                            images: ['/favicon.ico'],
+                        };
+
+                        return {
+                            ...item,
+                            productId,
+                            product,
+                        };
+                    }),
+                };
+            }));
+
+            setOrders(hydratedOrders);
+        } catch {
+            setOrders([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        setOrders(orderDummyData)
+        fetchOrders()
     }, []);
+
+    if (loading) {
+        return <Loading />
+    }
 
     return (
         <div className="min-h-[70vh] mx-6">

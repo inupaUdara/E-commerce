@@ -1,5 +1,6 @@
 package com.gocart.orderservice.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,6 +17,10 @@ import java.io.Serializable;
 public class OrderItem {
 
     @EmbeddedId
+    @AttributeOverrides({
+            @AttributeOverride(name = "orderId", column = @Column(name = "order_id")),
+            @AttributeOverride(name = "productId", column = @Column(name = "product_id"))
+    })
     private OrderItemId id;
 
     @Column(nullable = false)
@@ -24,9 +29,10 @@ public class OrderItem {
     @Column(nullable = false)
     private Double price;
 
+    @JsonIgnore
     @ManyToOne
     @MapsId("orderId")
-    @JoinColumn(name = "orderId")
+    @JoinColumn(name = "order_id")
     private Order order;
 
     @Data

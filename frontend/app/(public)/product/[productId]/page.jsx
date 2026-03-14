@@ -3,25 +3,43 @@ import ProductDescription from "@/components/ProductDescription";
 import ProductDetails from "@/components/ProductDetails";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { getProductById } from "@/lib/api/productApi";
+import Loading from "@/components/Loading";
 
 export default function Product() {
 
     const { productId } = useParams();
     const [product, setProduct] = useState();
-    const products = useSelector(state => state.product.list);
+    const [loading, setLoading] = useState(true)
+
+    const normalizedProductId = Array.isArray(productId) ? productId[0] : productId
+    const safeProductId = normalizedProductId ? decodeURIComponent(normalizedProductId) : ''
 
     const fetchProduct = async () => {
-        const product = products.find((product) => product.id === productId);
-        setProduct(product);
+        setLoading(true)
+        try {
+            if (!safeProductId || safeProductId === '<id>' || safeProductId === 'undefined' || safeProductId === 'null') {
+                setProduct(null)
+                return
+            }
+
+            const data = await getProductById(safeProductId)
+            setProduct(data)
+        } catch (error) {
+            setProduct(null)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
-        if (products.length > 0) {
-            fetchProduct()
-        }
+        fetchProduct()
         scrollTo(0, 0)
-    }, [productId,products]);
+    }, [safeProductId]);
+
+    if (loading) {
+        return <Loading />
+    }
 
     return (
         <div className="mx-6">

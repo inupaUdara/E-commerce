@@ -25,8 +25,10 @@ public class OrderController {
 
     @PostMapping
     @Operation(summary = "Create a new order", description = "Creates a new order with validation of user, address, store, and products")
-    public ResponseEntity<Order> createOrder(@RequestBody OrderRequest request) {
-        Order order = orderService.createOrder(request);
+    public ResponseEntity<Order> createOrder(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody OrderRequest request) {
+        Order order = orderService.createOrder(authorization, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 

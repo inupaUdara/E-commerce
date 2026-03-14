@@ -4,6 +4,18 @@ import client from './client';
  * Product API functions
  */
 
+// Get all products
+export const getAllProducts = async () => {
+    const response = await client.get('/products');
+    return response.data;
+};
+
+// Get product by ID
+export const getProductById = async (productId) => {
+    const response = await client.get(`/products/${productId}`);
+    return response.data;
+};
+
 // Create a new product
 export const createProduct = async (productData) => {
     const response = await client.post('/products', productData);
@@ -37,6 +49,8 @@ export const deleteProduct = async (productId) => {
 };
 
 export default {
+    getAllProducts,
+    getProductById,
     createProduct,
     getProductsByStoreId,
     updateProduct,

@@ -2,8 +2,9 @@
 import { XIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
+import { createAddress } from "@/lib/api/addressApi"
 
-const AddressModal = ({ setShowAddressModal }) => {
+const AddressModal = ({ setShowAddressModal, onAddressCreated }) => {
 
     const [address, setAddress] = useState({
         name: '',
@@ -25,6 +26,12 @@ const AddressModal = ({ setShowAddressModal }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+
+        const savedAddress = await createAddress(address)
+
+        if (onAddressCreated) {
+            onAddressCreated(savedAddress)
+        }
 
         setShowAddressModal(false)
     }

@@ -3,6 +3,7 @@ import Counter from "@/components/Counter";
 import OrderSummary from "@/components/OrderSummary";
 import PageTitle from "@/components/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
+import { getProductById } from "@/lib/api/productApi";
 import { Trash2Icon } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -12,28 +13,60 @@ export default function Cart() {
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
     
-    const { cartItems } = useSelector(state => state.cart);
-    const products = useSelector(state => state.product.list);
+    const { cartItems, hydrated } = useSelector(state => state.cart);
 
     const dispatch = useDispatch();
 
     const [cartArray, setCartArray] = useState([]);
     const [totalPrice, setTotalPrice] = useState(0);
+    const [loading, setLoading] = useState(true);
 
-    const createCartArray = () => {
-        setTotalPrice(0);
-        const cartArray = [];
-        for (const [key, value] of Object.entries(cartItems)) {
-            const product = products.find(product => product.id === key);
-            if (product) {
-                cartArray.push({
-                    ...product,
-                    quantity: value,
-                });
-                setTotalPrice(prev => prev + product.price * value);
-            }
+    const createCartArray = async () => {
+        if (!hydrated) {
+            return;
         }
-        setCartArray(cartArray);
+
+        const entries = Object.entries(cartItems || {})
+
+        if (entries.length === 0) {
+            setCartArray([])
+            setTotalPrice(0)
+            setLoading(false)
+            return
+        }
+
+        setLoading(true)
+
+        const products = await Promise.all(
+            entries.map(async ([productId]) => {
+                try {
+                    return await getProductById(productId)
+                } catch {
+                    return null
+                }
+            })
+        )
+
+        const nextCartArray = entries.reduce((result, [productId, quantity], index) => {
+            const product = products[index]
+
+            if (!product) {
+                return result
+            }
+
+            result.push({
+                ...product,
+                quantity,
+            })
+
+            return result
+        }, [])
+
+        const nextTotalPrice = nextCartArray.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+        setCartArray(nextCartArray)
+        setTotalPrice(nextTotalPrice)
+        setLoading(false)
     }
 
     const handleDeleteItemFromCart = (productId) => {
@@ -41,10 +74,16 @@ export default function Cart() {
     }
 
     useEffect(() => {
-        if (products.length > 0) {
-            createCartArray();
-        }
-    }, [cartItems, products]);
+        createCartArray()
+    }, [cartItems, hydrated]);
+
+    if (!hydrated || loading) {
+        return (
+            <div className="min-h-[80vh] mx-6 flex items-center justify-center text-slate-400">
+                <h1 className="text-2xl sm:text-4xl font-semibold">Loading cart...</h1>
+            </div>
+        )
+    }
 
     return cartArray.length > 0 ? (
         <div className="min-h-screen mx-6 text-slate-800">
@@ -70,7 +109,7 @@ export default function Cart() {
                                     <tr key={index} className="space-x-2">
                                         <td className="flex gap-3 my-4">
                                             <div className="flex gap-3 items-center justify-center bg-slate-100 size-18 rounded-md">
-                                                <Image src={item.images[0]} className="h-14 w-auto" alt="" width={45} height={45} />
+                                                <Image src={item.images?.[0] || '/favicon.ico'} className="h-14 w-auto" alt="" width={45} height={45} />
                                             </div>
                                             <div>
                                                 <p className="max-sm:text-sm">{item.name}</p>
