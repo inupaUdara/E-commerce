@@ -3,7 +3,9 @@ import { useEffect, useState } from "react"
 import { toast } from "react-hot-toast"
 import Image from "next/image"
 import Loading from "@/components/Loading"
-import { productDummyData } from "@/assets/assets"
+import { getProductsByStoreId, toggleProductStock } from "@/lib/api/productApi"
+import { getMyStore } from "@/lib/api/storeApi"
+import { assets } from "@/assets/assets"
 
 export default function StoreManageProducts() {
 
@@ -13,13 +15,37 @@ export default function StoreManageProducts() {
     const [products, setProducts] = useState([])
 
     const fetchProducts = async () => {
-        setProducts(productDummyData)
-        setLoading(false)
+        setLoading(true)
+        try {
+            const store = await getMyStore()
+            if (!store?.id) {
+                setProducts([])
+                return
+            }
+            const data = await getProductsByStoreId(store.id)
+            setProducts(data || [])
+        } catch (error) {
+            const message = error?.response?.data?.message || error?.response?.data || 'Failed to fetch products'
+            toast.error(typeof message === 'string' ? message : 'Failed to fetch products')
+            setProducts([])
+        } finally {
+            setLoading(false)
+        }
     }
 
     const toggleStock = async (productId) => {
-        // Logic to toggle the stock of a product
+        const target = products.find((item) => item.id === productId)
+        if (!target) return
 
+        try {
+            const updated = await toggleProductStock(target)
+            setProducts((prev) => prev.map((item) => item.id === productId ? updated : item))
+            toast.success(`Product marked as ${updated.inStock ? 'In Stock' : 'Out of Stock'}`)
+        } catch (error) {
+            const message = error?.response?.data?.message || error?.response?.data || 'Failed to update stock'
+            toast.error(typeof message === 'string' ? message : 'Failed to update stock')
+            throw error
+        }
 
     }
 
@@ -47,7 +73,7 @@ export default function StoreManageProducts() {
                         <tr key={product.id} className="border-t border-gray-200 hover:bg-gray-50">
                             <td className="px-4 py-3">
                                 <div className="flex gap-2 items-center">
-                                    <Image width={40} height={40} className='p-1 shadow rounded cursor-pointer' src={product.images[0]} alt="" />
+                                    <Image width={40} height={40} className='p-1 shadow rounded cursor-pointer' src={product.images?.[0] || assets.upload_area} alt="" />
                                     {product.name}
                                 </div>
                             </td>

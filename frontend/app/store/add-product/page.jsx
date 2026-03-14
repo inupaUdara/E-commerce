@@ -3,8 +3,12 @@ import { assets } from "@/assets/assets"
 import Image from "next/image"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
+import { createProduct } from "@/lib/api/productApi"
+import { getMyStore } from "@/lib/api/storeApi"
+import { useRouter } from "next/navigation"
 
 export default function StoreAddProduct() {
+    const router = useRouter()
 
     const categories = ['Electronics', 'Clothing', 'Home & Kitchen', 'Beauty & Health', 'Toys & Games', 'Sports & Outdoors', 'Books & Media', 'Food & Drink', 'Hobbies & Crafts', 'Others']
 
@@ -23,9 +27,71 @@ export default function StoreAddProduct() {
         setProductInfo({ ...productInfo, [e.target.name]: e.target.value })
     }
 
+    const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+        })
+    }
+
     const onSubmitHandler = async (e) => {
         e.preventDefault()
-        // Logic to add a product
+        if (!productInfo.name || !productInfo.description || !productInfo.category) {
+            throw new Error("Please fill all required product fields")
+        }
+
+        if (!productInfo.mrp || !productInfo.price) {
+            throw new Error("Please provide valid prices")
+        }
+
+        const selectedFiles = Object.values(images).filter(Boolean)
+        if (selectedFiles.length === 0) {
+            throw new Error("Please upload at least one image")
+        }
+
+        setLoading(true)
+
+        try {
+            const store = await getMyStore()
+            if (!store?.id) {
+                throw new Error("Store not found. Please create your store first.")
+            }
+
+            const imageUrls = await Promise.all(selectedFiles.map(fileToBase64))
+
+            const payload = {
+                name: productInfo.name,
+                description: productInfo.description,
+                mrp: Number(productInfo.mrp),
+                price: Number(productInfo.price),
+                images: imageUrls,
+                category: productInfo.category,
+                inStock: true,
+                storeId: store.id,
+            }
+
+            await createProduct(payload)
+            toast.success("Product added successfully")
+
+            setImages({ 1: null, 2: null, 3: null, 4: null })
+            setProductInfo({
+                name: "",
+                description: "",
+                mrp: 0,
+                price: 0,
+                category: "",
+            })
+
+            router.push('/store/manage-product')
+        } catch (error) {
+            const message = error?.response?.data?.message || error?.response?.data || error?.message || "Failed to add product"
+            toast.error(typeof message === 'string' ? message : "Failed to add product")
+            throw error
+        } finally {
+            setLoading(false)
+        }
         
     }
 
