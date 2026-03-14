@@ -1,0 +1,106 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        # User Service Routes
+        - id: user-auth-route
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/auth/**
+
+        - id: user-service-route
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/users/**
+
+        - id: address-service-route
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/addresses/**
+
+        # Store Service Routes
+        - id: store-service-route
+          uri: ${STORE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/stores/**
+
+        # Product Service Routes
+        - id: product-service-route
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/products/**
+
+        - id: rating-service-route
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/ratings/**
+
+        # Order Service Routes
+        - id: order-service-route
+          uri: ${ORDER_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/orders/**
+
+        - id: coupon-service-route
+          uri: ${ORDER_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/coupons/**
+
+        # OpenAPI Documentation Routes
+        - id: user-api-docs-route
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api-docs/user
+          filters:
+            - RewritePath=/api-docs/user, /api-docs
+
+        - id: product-api-docs-route
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api-docs/product
+          filters:
+            - RewritePath=/api-docs/product, /api-docs
+
+        - id: store-api-docs-route
+          uri: ${STORE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api-docs/store
+          filters:
+            - RewritePath=/api-docs/store, /api-docs
+
+        - id: order-api-docs-route
+          uri: ${ORDER_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api-docs/order
+          filters:
+            - RewritePath=/api-docs/order, /api-docs
+
+# Management & Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      show-details: always
