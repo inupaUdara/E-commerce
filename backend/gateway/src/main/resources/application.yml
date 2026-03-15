@@ -66,6 +66,11 @@ spring:
           predicates:
             - Path=/api/coupons/**
 
+        - id: notification-service-route
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/notifications/**
+
         # OpenAPI Documentation Routes
         - id: user-api-docs-route
           uri: ${USER_SERVICE_URL:http://localhost:8081}

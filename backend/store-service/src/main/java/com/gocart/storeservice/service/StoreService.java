@@ -1,6 +1,8 @@
 package com.gocart.storeservice.service;
 
 import com.gocart.storeservice.client.UserServiceClient;
+import com.gocart.storeservice.client.NotificationServiceClient;
+import com.gocart.storeservice.dto.InternalNotificationRequest;
 import com.gocart.storeservice.dto.StoreRequest;
 import com.gocart.storeservice.dto.UserResponse;
 import com.gocart.storeservice.entity.Store;
@@ -8,6 +10,7 @@ import com.gocart.storeservice.repository.StoreRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,6 +24,10 @@ public class StoreService {
 
     private final StoreRepository storeRepository;
     private final UserServiceClient userServiceClient;
+    private final NotificationServiceClient notificationServiceClient;
+
+    @Value("${notification.internal-key:change-me}")
+    private String notificationInternalKey;
 
     public Store createStore(String userId, String authorization, StoreRequest request) {
         if (authorization == null || authorization.isBlank() || !authorization.startsWith("Bearer ")) {
@@ -50,7 +57,9 @@ public class StoreService {
                 .email(request.getEmail())
                 .contact(request.getContact())
                 .build();
-        return storeRepository.save(store);
+        Store savedStore = storeRepository.save(store);
+        publishStoreRegisteredNotification(savedStore);
+        return savedStore;
     }
 
     public Optional<Store> getStoreById(String id) {
@@ -92,7 +101,13 @@ public class StoreService {
         Store store = storeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Store not found"));
         store.setStatus(status);
-        return storeRepository.save(store);
+        Store savedStore = storeRepository.save(store);
+
+        if ("approved".equalsIgnoreCase(status)) {
+            publishStoreApprovedNotification(savedStore);
+        }
+
+        return savedStore;
     }
 
     public Store updateStoreActivation(String id, Boolean isActive) {
@@ -104,5 +119,42 @@ public class StoreService {
 
     public void deleteStore(String id) {
         storeRepository.deleteById(id);
+    }
+
+    private void publishStoreRegisteredNotification(Store store) {
+        try {
+            InternalNotificationRequest notification = InternalNotificationRequest.builder()
+                    .recipientRole("ADMIN")
+                    .type("STORE_REGISTERED")
+                    .title("New store registration")
+                    .message("Store '" + store.getName() + "' is waiting for approval")
+                    .entityId(store.getId())
+                    .build();
+
+            notificationServiceClient.publishInternal(notificationInternalKey, notification);
+        } catch (Exception ex) {
+            log.warn("Failed to publish STORE_REGISTERED notification for store {}: {}", store.getId(), ex.getMessage());
+        }
+    }
+
+    private void publishStoreApprovedNotification(Store store) {
+        try {
+            if (store.getUserId() == null || store.getUserId().isBlank()) {
+                return;
+            }
+
+            InternalNotificationRequest notification = InternalNotificationRequest.builder()
+                    .recipientUserId(store.getUserId())
+                    .recipientEmail(store.getEmail())
+                    .type("STORE_APPROVED")
+                    .title("Store approved")
+                    .message("Your store '" + store.getName() + "' has been approved")
+                    .entityId(store.getId())
+                    .build();
+
+            notificationServiceClient.publishInternal(notificationInternalKey, notification);
+        } catch (Exception ex) {
+            log.warn("Failed to publish STORE_APPROVED notification for store {}: {}", store.getId(), ex.getMessage());
+        }
     }
 }

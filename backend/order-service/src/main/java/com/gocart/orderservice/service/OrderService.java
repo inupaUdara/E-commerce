@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gocart.orderservice.client.ProductServiceClient;
 import com.gocart.orderservice.client.StoreServiceClient;
 import com.gocart.orderservice.client.UserServiceClient;
+import com.gocart.orderservice.client.NotificationServiceClient;
 import com.gocart.orderservice.dto.*;
 import com.gocart.orderservice.entity.Coupon;
 import com.gocart.orderservice.entity.Order;
@@ -15,6 +16,7 @@ import com.gocart.orderservice.repository.OrderRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
@@ -37,7 +39,11 @@ public class OrderService {
     private final UserServiceClient userServiceClient;
     private final StoreServiceClient storeServiceClient;
     private final ProductServiceClient productServiceClient;
+    private final NotificationServiceClient notificationServiceClient;
     private final ObjectMapper objectMapper;
+
+    @Value("${notification.internal-key:change-me}")
+    private String notificationInternalKey;
 
     @Transactional
     public Order createOrder(String authorization, OrderRequest request) {
@@ -46,12 +52,13 @@ public class OrderService {
         }
 
         // Validate user exists
+        UserResponse currentUser;
         try {
-            UserResponse user = userServiceClient.getCurrentUser(authorization);
-            if (user == null) {
+            currentUser = userServiceClient.getCurrentUser(authorization);
+            if (currentUser == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unable to identify the current user");
             }
-            if (user.getId() == null || !user.getId().equals(request.getUserId())) {
+            if (currentUser.getId() == null || !currentUser.getId().equals(request.getUserId())) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Order user does not match the authenticated user");
             }
         } catch (FeignException.Forbidden e) {
@@ -86,9 +93,10 @@ public class OrderService {
         }
 
         // Validate store exists
+        StoreResponse targetStore;
         try {
-            StoreResponse store = storeServiceClient.getStoreById(request.getStoreId());
-            if (store == null) {
+            targetStore = storeServiceClient.getStoreById(request.getStoreId());
+            if (targetStore == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found with id: " + request.getStoreId());
             }
         } catch (FeignException.NotFound e) {
@@ -176,6 +184,9 @@ public class OrderService {
         }
 
         savedOrder.setOrderItems(orderItems);
+
+        publishOrderPlacedNotification(savedOrder, currentUser, targetStore);
+
         return savedOrder;
     }
 
@@ -203,6 +214,7 @@ public class OrderService {
     @Transactional
     public Order updateOrder(String id, OrderUpdateRequest request) {
         Order order = getOrderById(id);
+        OrderStatus previousStatus = order.getStatus();
         
         if (request.getStatus() != null) {
             order.setStatus(request.getStatus());
@@ -213,12 +225,60 @@ public class OrderService {
         }
         
         order.setUpdatedAt(LocalDateTime.now());
-        return orderRepository.save(order);
+        Order updatedOrder = orderRepository.save(order);
+
+        if (request.getStatus() != null && previousStatus != request.getStatus()) {
+            publishOrderStatusUpdateNotification(updatedOrder);
+        }
+
+        return updatedOrder;
     }
 
     @Transactional
     public void deleteOrder(String id) {
         Order order = getOrderById(id);
         orderRepository.delete(order);
+    }
+
+    private void publishOrderPlacedNotification(Order order, UserResponse customer, StoreResponse store) {
+        try {
+            if (store == null || store.getUserId() == null || store.getUserId().isBlank()) {
+                return;
+            }
+
+            String customerName = customer != null && customer.getName() != null ? customer.getName() : "A customer";
+            InternalNotificationRequest notification = InternalNotificationRequest.builder()
+                    .recipientUserId(store.getUserId())
+                    .recipientEmail(store.getEmail())
+                    .type("ORDER_PLACED")
+                    .title("New order received")
+                    .message(customerName + " placed a new order (#" + order.getId() + ")")
+                    .entityId(order.getId())
+                    .build();
+
+            notificationServiceClient.publishInternal(notificationInternalKey, notification);
+        } catch (Exception ex) {
+            log.warn("Failed to publish ORDER_PLACED notification for order {}: {}", order.getId(), ex.getMessage());
+        }
+    }
+
+    private void publishOrderStatusUpdateNotification(Order order) {
+        try {
+            if (order.getUserId() == null || order.getUserId().isBlank()) {
+                return;
+            }
+
+            InternalNotificationRequest notification = InternalNotificationRequest.builder()
+                    .recipientUserId(order.getUserId())
+                    .type("ORDER_STATUS_UPDATED")
+                    .title("Order status updated")
+                    .message("Your order #" + order.getId() + " is now " + order.getStatus())
+                    .entityId(order.getId())
+                    .build();
+
+            notificationServiceClient.publishInternal(notificationInternalKey, notification);
+        } catch (Exception ex) {
+            log.warn("Failed to publish ORDER_STATUS_UPDATED notification for order {}: {}", order.getId(), ex.getMessage());
+        }
     }
 }

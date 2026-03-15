@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 
 import { fetchCurrentUser, logout, setAuthFromStorage } from "@/lib/features/auth/authSlice";
 import { useDispatch } from "react-redux";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
 
@@ -76,6 +77,8 @@ const Navbar = () => {
                                 <span className="absolute -top-1.5 left-3.5 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 size-5 rounded-full shadow-sm">{cartCount}</span>
                             </Link>
                         )}
+
+                        <NotificationBell isAuthenticated={isAuthenticated} />
 
                         {mounted ? (
                             isAuthenticated ? (

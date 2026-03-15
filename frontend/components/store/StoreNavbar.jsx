@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useDispatch, useSelector } from "react-redux"
 import { fetchCurrentUser, logout, setAuthFromStorage } from "@/lib/features/auth/authSlice"
+import NotificationBell from "@/components/NotificationBell"
 
 const StoreNavbar = () => {
     const dispatch = useDispatch()
@@ -34,6 +35,7 @@ const StoreNavbar = () => {
                 </p>
             </Link>
             <div className="flex items-center gap-3">
+                <NotificationBell isAuthenticated={true} />
                 <p className="text-slate-700">Hi, {user?.name || 'Seller'}</p>
                 <button
                     type="button"

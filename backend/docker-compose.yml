@@ -79,6 +79,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Notification Database
+  notification-db:
+    image: postgres:16-alpine
+    container_name: notification-db
+    environment:
+      - POSTGRES_DB=notificationdb
+      - POSTGRES_USER=notification
+      - POSTGRES_PASSWORD=notificationpass
+    ports:
+      - "5437:5432"
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification -d notificationdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # User Service
   user-service:
     build:
@@ -126,10 +146,14 @@ services:
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_H2_CONSOLE_ENABLED=false
       - USER_SERVICE_URL=http://user-service:8081
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - NOTIFICATION_INTERNAL_KEY=change-me
     depends_on:
       store-db:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      notification-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
@@ -190,6 +214,8 @@ services:
       - USER_SERVICE_URL=http://user-service:8081
       - STORE_SERVICE_URL=http://store-service:8083
       - PRODUCT_SERVICE_URL=http://product-service:8082
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - NOTIFICATION_INTERNAL_KEY=change-me
     depends_on:
       order-db:
         condition: service_healthy
@@ -199,8 +225,48 @@ services:
         condition: service_healthy
       product-service:
         condition: service_healthy
+      notification-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    networks:
+      - microservices-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://notification-db:5432/notificationdb
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_DATASOURCE_USERNAME=notification
+      - SPRING_DATASOURCE_PASSWORD=notificationpass
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_H2_CONSOLE_ENABLED=false
+      - USER_SERVICE_URL=http://user-service:8081
+      - NOTIFICATION_INTERNAL_KEY=change-me
+      - NOTIFICATION_EMAIL_ENABLED=false
+      - MAIL_HOST=
+      - MAIL_PORT=587
+      - MAIL_USERNAME=
+      - MAIL_PASSWORD=
+      - NOTIFICATION_EMAIL_FROM=no-reply@gocart.local
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -222,6 +288,7 @@ services:
       - STORE_SERVICE_URL=http://store-service:8083
       - PRODUCT_SERVICE_URL=http://product-service:8082
       - ORDER_SERVICE_URL=http://order-service:8084
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
     depends_on:
       user-service:
         condition: service_healthy
@@ -230,6 +297,8 @@ services:
       product-service:
         condition: service_healthy
       order-service:
+        condition: service_healthy
+      notification-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
@@ -265,3 +334,4 @@ volumes:
   store-db-data:
   product-db-data:
   order-db-data:
+  notification-db-data:
