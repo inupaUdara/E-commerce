@@ -58,18 +58,21 @@ const Navbar = () => {
                         <Link href="/" className="hover:text-green-600 transition">Home</Link>
                         <Link href="/shop" className="hover:text-green-600 transition">Shop</Link>
                         {/* <Link href="/" className="hover:text-green-600 transition">About</Link> */}
-                        <Link href="/orders" className="hover:text-green-600 transition">Orders</Link>
-
+                        {isAuthenticated && (
+                            <Link href="/orders" className="hover:text-green-600 transition">Orders</Link>
+                        )}
                         <form onSubmit={handleSearch} className="hidden xl:flex items-center w-80 text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full focus-within:ring-2 ring-green-500/20 transition">
                             <Search size={18} className="text-slate-500" />
                             <input className="w-full bg-transparent outline-none placeholder-slate-500 text-slate-700" type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} required />
                         </form>
 
-                        <Link href="/cart" className="relative flex items-center gap-2 text-slate-600 hover:text-green-600 transition">
-                            <ShoppingCart size={22} />
-                            <span className="hidden lg:block">Cart</span>
-                            <span className="absolute -top-1.5 left-3.5 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 size-5 rounded-full shadow-sm">{cartCount}</span>
-                        </Link>
+                        {isAuthenticated && (
+                            <Link href="/cart" className="relative flex items-center gap-2 text-slate-600 hover:text-green-600 transition">
+                                <ShoppingCart size={22} />
+                                <span className="hidden lg:block">Cart</span>
+                                <span className="absolute -top-1.5 left-3.5 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 size-5 rounded-full shadow-sm">{cartCount}</span>
+                            </Link>
+                        )}
 
                         {mounted ? (
                             isAuthenticated ? (
