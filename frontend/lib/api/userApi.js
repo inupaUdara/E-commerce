@@ -30,10 +30,16 @@ export const unfollowStore = async (storeId) => {
     return response.data;
 };
 
+export const getFollowerCount = async (storeId) => {
+    const response = await client.get(`/users/followers/count?storeId=${storeId}`);
+    return response.data;
+};
+
 export default {
     getCurrentUser,
     getUserById,
     getFollowedStores,
     followStore,
     unfollowStore,
+    getFollowerCount,
 };

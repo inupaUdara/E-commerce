@@ -73,6 +73,12 @@ public class UserService {
                 return user.getFollowedStoreIds() == null ? List.of() : List.copyOf(user.getFollowedStoreIds());
         }
 
+        public long countFollowers(String storeId) {
+                return userRepository.findAll().stream()
+                                .filter(u -> u.getFollowedStoreIds() != null && u.getFollowedStoreIds().contains(storeId))
+                                .count();
+        }
+
         private void validateStoreCanBeFollowed(String storeId) {
                 if (storeId == null || storeId.isBlank()) {
                         throw new IllegalArgumentException("Store ID is required");

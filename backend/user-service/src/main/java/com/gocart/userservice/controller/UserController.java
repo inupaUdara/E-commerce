@@ -60,4 +60,10 @@ public class UserController {
         String email = authentication.getName();
         return ResponseEntity.ok(userService.getFollowedStoreIds(email));
     }
+
+    @GetMapping("/followers/count")
+    @Operation(summary = "Get follower count for a store", description = "Returns the number of users following the given store")
+    public ResponseEntity<Long> getFollowerCount(@RequestParam String storeId) {
+        return ResponseEntity.ok(userService.countFollowers(storeId));
+    }
 }

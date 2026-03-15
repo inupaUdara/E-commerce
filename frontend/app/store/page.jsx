@@ -1,6 +1,6 @@
 'use client'
 import Loading from "@/components/Loading"
-import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
+import { CircleDollarSignIcon, HeartIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -8,7 +8,7 @@ import { getMyStore } from "@/lib/api/storeApi"
 import { getProductsByStoreId } from "@/lib/api/productApi"
 import { getOrdersByStoreId } from "@/lib/api/orderApi"
 import { getRatingsByProductId } from "@/lib/api/ratingApi"
-import { getUserById } from "@/lib/api/userApi"
+import { getUserById, getFollowerCount } from "@/lib/api/userApi"
 import toast from "react-hot-toast"
 
 export default function Dashboard() {
@@ -23,6 +23,7 @@ export default function Dashboard() {
         totalEarnings: 0,
         totalOrders: 0,
         ratings: [],
+        followers: 0,
     })
 
     const dashboardCardsData = [
@@ -30,6 +31,7 @@ export default function Dashboard() {
         { title: 'Total Earnings', value: currency + Number(dashboardData.totalEarnings || 0).toFixed(2), icon: CircleDollarSignIcon },
         { title: 'Total Orders', value: dashboardData.totalOrders, icon: TagsIcon },
         { title: 'Total Ratings', value: dashboardData.ratings.length, icon: StarIcon },
+        { title: 'Followers', value: dashboardData.followers, icon: HeartIcon },
     ]
 
     const fetchDashboardData = async () => {
@@ -47,9 +49,10 @@ export default function Dashboard() {
                 return
             }
 
-            const [products, orders] = await Promise.all([
+            const [products, orders, followers] = await Promise.all([
                 getProductsByStoreId(store.id),
                 getOrdersByStoreId(store.id),
+                getFollowerCount(store.id).catch(() => 0),
             ])
 
             const productList = products || []
@@ -89,6 +92,7 @@ export default function Dashboard() {
                 totalEarnings,
                 totalOrders: orderList.length,
                 ratings: hydratedRatings,
+                followers: Number(followers) || 0,
             })
         } catch (error) {
             setDashboardData({
@@ -96,6 +100,7 @@ export default function Dashboard() {
                 totalEarnings: 0,
                 totalOrders: 0,
                 ratings: [],
+                followers: 0,
             })
             toast.error(error?.response?.data?.message || 'Failed to load store dashboard')
         } finally {
