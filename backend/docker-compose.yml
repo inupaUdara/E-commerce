@@ -97,6 +97,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=userpass
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
       - SPRING_H2_CONSOLE_ENABLED=false
+      - STORE_SERVICE_URL=http://store-service:8083
     depends_on:
       - user-db
     healthcheck:

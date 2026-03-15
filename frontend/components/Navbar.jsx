@@ -61,6 +61,9 @@ const Navbar = () => {
                         {isAuthenticated && (
                             <Link href="/orders" className="hover:text-green-600 transition">Orders</Link>
                         )}
+                        {isAuthenticated && (
+                            <Link href="/following" className="hover:text-green-600 transition">Following</Link>
+                        )}
                         <form onSubmit={handleSearch} className="hidden xl:flex items-center w-80 text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full focus-within:ring-2 ring-green-500/20 transition">
                             <Search size={18} className="text-slate-500" />
                             <input className="w-full bg-transparent outline-none placeholder-slate-500 text-slate-700" type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} required />

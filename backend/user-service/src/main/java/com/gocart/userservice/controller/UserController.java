@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -32,5 +34,30 @@ public class UserController {
     public ResponseEntity<UserResponse> getUserById(@PathVariable String id) {
         UserResponse user = userService.getUserById(id);
         return ResponseEntity.ok(user);
+    }
+
+    @PostMapping("/me/followed-stores/{storeId}")
+    @Operation(summary = "Follow a store", description = "Adds a store to the current user's followed stores list")
+    public ResponseEntity<UserResponse> followStore(
+            Authentication authentication,
+            @PathVariable String storeId) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(userService.followStore(email, storeId));
+    }
+
+    @DeleteMapping("/me/followed-stores/{storeId}")
+    @Operation(summary = "Unfollow a store", description = "Removes a store from the current user's followed stores list")
+    public ResponseEntity<UserResponse> unfollowStore(
+            Authentication authentication,
+            @PathVariable String storeId) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(userService.unfollowStore(email, storeId));
+    }
+
+    @GetMapping("/me/followed-stores")
+    @Operation(summary = "Get followed stores", description = "Returns followed store IDs for the current user")
+    public ResponseEntity<List<String>> getFollowedStores(Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(userService.getFollowedStoreIds(email));
     }
 }

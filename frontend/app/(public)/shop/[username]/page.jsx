@@ -7,6 +7,8 @@ import Loading from "@/components/Loading"
 import Image from "next/image"
 import { getStoreByUsername } from "@/lib/api/storeApi"
 import { getProductsByStoreId } from "@/lib/api/productApi"
+import { followStore, getCurrentUser, unfollowStore } from "@/lib/api/userApi"
+import toast from "react-hot-toast"
 
 export default function StoreShop() {
 
@@ -14,12 +16,22 @@ export default function StoreShop() {
     const [products, setProducts] = useState([])
     const [storeInfo, setStoreInfo] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [isFollowing, setIsFollowing] = useState(false)
+    const [followLoading, setFollowLoading] = useState(false)
 
     const fetchStoreData = async () => {
         setLoading(true)
         try {
             const store = await getStoreByUsername(username)
             setStoreInfo(store)
+
+            try {
+                const user = await getCurrentUser()
+                const followedStoreIds = Array.isArray(user?.followedStoreIds) ? user.followedStoreIds : []
+                setIsFollowing(Boolean(store?.id) && followedStoreIds.includes(store.id))
+            } catch {
+                setIsFollowing(false)
+            }
 
             if (store?.id) {
                 const storeProducts = await getProductsByStoreId(store.id)
@@ -32,6 +44,29 @@ export default function StoreShop() {
             setProducts([])
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleFollowToggle = async () => {
+        if (!storeInfo?.id) {
+            return
+        }
+
+        setFollowLoading(true)
+        try {
+            if (isFollowing) {
+                const updatedUser = await unfollowStore(storeInfo.id)
+                setIsFollowing((updatedUser?.followedStoreIds || []).includes(storeInfo.id))
+                toast.success('Store unfollowed')
+            } else {
+                const updatedUser = await followStore(storeInfo.id)
+                setIsFollowing((updatedUser?.followedStoreIds || []).includes(storeInfo.id))
+                toast.success('Store followed')
+            }
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Please login to follow stores')
+        } finally {
+            setFollowLoading(false)
         }
     }
 
@@ -53,7 +88,17 @@ export default function StoreShop() {
                         height={200}
                     />
                     <div className="text-center md:text-left">
-                        <h1 className="text-3xl font-semibold text-slate-800">{storeInfo.name}</h1>
+                        <div className="flex flex-col md:flex-row md:items-center gap-4">
+                            <h1 className="text-3xl font-semibold text-slate-800">{storeInfo.name}</h1>
+                            <button
+                                type="button"
+                                onClick={handleFollowToggle}
+                                disabled={followLoading}
+                                className={`px-5 py-2 rounded-full text-sm font-medium transition ${isFollowing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-green-600 text-white hover:bg-green-700'} disabled:opacity-60 disabled:cursor-not-allowed`}
+                            >
+                                {followLoading ? 'Saving...' : isFollowing ? 'Following' : 'Follow Store'}
+                            </button>
+                        </div>
                         <p className="text-sm text-slate-600 mt-2 max-w-lg">{storeInfo.description}</p>
                         <div className="text-xs text-slate-500 mt-4 space-y-1"></div>
                         <div className="space-y-2 text-sm text-slate-500">

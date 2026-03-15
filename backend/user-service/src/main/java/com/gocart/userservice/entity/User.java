@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -39,6 +40,11 @@ public class User {
     @Column(columnDefinition = "jsonb")
     @Builder.Default
     private String cart = "{}";
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    @Builder.Default
+    private List<String> followedStoreIds = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
