@@ -14,7 +14,7 @@ export default function Home() {
             <FollowedStoreProducts />
             <BestSelling />
             <OurSpecs />
-            <Newsletter />
+            {/* <Newsletter /> */}
         </div>
     );
 }
