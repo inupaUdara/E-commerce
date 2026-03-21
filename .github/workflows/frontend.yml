@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Ensure sharp binary is available
+        run: npm install --no-save --include=optional sharp
+
       - name: Lint
         continue-on-error: true
         run: npm run lint
