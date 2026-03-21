@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080"})
+@CrossOrigin(originPatterns = {"${CORS_ALLOWED_ORIGIN:http://localhost:3000}", "http://localhost:8080"})
 @RequiredArgsConstructor
 @Tag(name = "Order", description = "Order management endpoints")
 public class OrderController {

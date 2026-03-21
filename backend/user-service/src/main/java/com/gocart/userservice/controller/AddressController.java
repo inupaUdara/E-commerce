@@ -16,7 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/addresses")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080"})
+@CrossOrigin(originPatterns = {"${CORS_ALLOWED_ORIGIN:http://localhost:3000}", "http://localhost:8080"})
 @Tag(name = "Address", description = "Address management APIs")
 @SecurityRequirement(name = "Bearer Authentication")
 public class AddressController {

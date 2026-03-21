@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ratings")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080"})
+@CrossOrigin(originPatterns = {"${CORS_ALLOWED_ORIGIN:http://localhost:3000}", "http://localhost:8080"})
 @Tag(name = "Rating", description = "Product rating and review APIs")
 public class RatingController {
 
