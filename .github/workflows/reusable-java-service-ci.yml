@@ -65,7 +65,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Snyk dependency scan (optional)
-        if: ${{ secrets.SNYK_TOKEN != '' }}
+        if: ${{ env.SNYK_TOKEN != '' }}
         uses: snyk/actions/maven@master
         continue-on-error: true
         env:
