@@ -15,6 +15,10 @@ on:
         description: Image name suffix for GHCR
         required: true
         type: string
+    secrets:
+      SNYK_TOKEN:
+        description: Optional token for Snyk dependency scanning
+        required: false
 
 permissions:
   contents: read
