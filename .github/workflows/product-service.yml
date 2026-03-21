@@ -15,6 +15,11 @@ on:
       - .github/workflows/reusable-java-service-ci.yml
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
 jobs:
   ci:
     uses: ./.github/workflows/reusable-java-service-ci.yml
