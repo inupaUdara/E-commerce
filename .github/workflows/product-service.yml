@@ -1,0 +1,25 @@
+name: Product Service CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - backend/product-service/**
+      - .github/workflows/product-service.yml
+      - .github/workflows/reusable-java-service-ci.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - backend/product-service/**
+      - .github/workflows/product-service.yml
+      - .github/workflows/reusable-java-service-ci.yml
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-java-service-ci.yml
+    with:
+      service_name: product-service
+      service_path: backend/product-service
+      image_name: gocart-product-service
+    secrets: inherit

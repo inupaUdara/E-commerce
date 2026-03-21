@@ -1,0 +1,25 @@
+name: Store Service CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - backend/store-service/**
+      - .github/workflows/store-service.yml
+      - .github/workflows/reusable-java-service-ci.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - backend/store-service/**
+      - .github/workflows/store-service.yml
+      - .github/workflows/reusable-java-service-ci.yml
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-java-service-ci.yml
+    with:
+      service_name: store-service
+      service_path: backend/store-service
+      image_name: gocart-store-service
+    secrets: inherit

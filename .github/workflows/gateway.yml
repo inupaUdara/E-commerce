@@ -1,0 +1,25 @@
+name: Gateway CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - backend/gateway/**
+      - .github/workflows/gateway.yml
+      - .github/workflows/reusable-java-service-ci.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - backend/gateway/**
+      - .github/workflows/gateway.yml
+      - .github/workflows/reusable-java-service-ci.yml
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-java-service-ci.yml
+    with:
+      service_name: gateway
+      service_path: backend/gateway
+      image_name: gocart-gateway
+    secrets: inherit
