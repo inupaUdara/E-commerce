@@ -14,7 +14,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/coupons")
-@CrossOrigin(originPatterns = {"${CORS_ALLOWED_ORIGIN:http://localhost:3000}", "http://localhost:8080"})
 @RequiredArgsConstructor
 @Tag(name = "Coupon", description = "Coupon management endpoints")
 public class CouponController {
